@@ -103,7 +103,8 @@ class Modal(private val a: Activity, private val host: FrameLayout, private val 
             card.addView(stack)
         } else {
             buttons.addView(button("Cancel", Theme.sub()) { close() })
-            val ok = { close(); onOk(field?.text?.toString()?.let { if (multiline) it else it.trim() } ?: "") }
+            // Once: Enter can report the action on key-down and again on key-up.
+            val ok = ok@{ if (!showing) return@ok; close(); onOk(field?.text?.toString()?.let { if (multiline) it else it.trim() } ?: "") }
             buttons.addView(button(action, Theme.accentInk()) { ok() })
             field?.setOnEditorActionListener { _, id, _ -> if (id == EditorInfo.IME_ACTION_DONE) { ok(); true } else false }
             card.addView(buttons)

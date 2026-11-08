@@ -338,8 +338,10 @@ class HomeActivity : Activity() {
             Menu.Row("Rename file", icon = R.drawable.ic_rename) { rename(d) },
             Menu.Row("Delete file", icon = R.drawable.ic_delete) {
                 modal.confirm("Delete file?", "“${d.name}” will be deleted from this device. This cannot be undone.", "Delete") {
+                    val fail = { toast("Couldn’t delete “${d.name}”") }
                     if (deleteFile(d)) { refresh(); toast("Deleted “${d.name}”") }
-                    else toast("Couldn’t delete “${d.name}”: the app that shared it doesn’t allow it")
+                    else if (!Disk.allowed(this)) withDisk { if (deleteFile(d)) { refresh(); toast("Deleted “${d.name}”") } else fail() }
+                    else fail()
                 }
             },
         )
@@ -354,20 +356,68 @@ class HomeActivity : Activity() {
             val newUri = try {
                 DocumentsContract.renameDocument(contentResolver, Uri.parse(d.uri), name)
             } catch (e: Exception) { null }
-            if (newUri == null) { toast("Couldn’t rename: the app that shared this file doesn’t allow it"); return@input }
-            try { contentResolver.takePersistableUriPermission(newUri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
+            if (newUri == null) { withDisk { renameOnDisk(d, name) }; return@input }
+            // Keep write too, or the next rename or delete after a restart is refused.
+            try {
+                contentResolver.takePersistableUriPermission(newUri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            } catch (_: Exception) {
+                try { contentResolver.takePersistableUriPermission(newUri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
+            }
             Store.rename(this, d.uri, newUri.toString(), name)
             refresh()
             toast("Renamed to “$name”")
         }
     }
 
-    /** Deletes the file itself, then forgets it. False if its provider refuses. */
+    /** A file another app opened read-only, renamed on disk; the list follows it to its new address. */
+    private fun renameOnDisk(d: DocState, name: String) {
+        val f = Disk.fileOf(this, d.uri) ?: run { toast("Couldn’t find “${d.name}” on this device"); return }
+        val to = Disk.rename(this, f, name) ?: run { toast("Couldn’t rename: “$name” already exists, or the folder is read-only"); return }
+        Store.rename(this, d.uri, Uri.fromFile(to).toString(), name)
+        refresh()
+        toast("Renamed to “$name”")
+    }
+
+    /** What waits for file access; it runs when the app comes back with access allowed. */
+    private var afterAccess: (() -> Unit)? = null
+    private val askFiles = 2
+
+    /** Runs [then] with file access, asking for it first if needed. */
+    private fun withDisk(then: () -> Unit) {
+        if (Disk.allowed(this)) { then(); return }
+        modal.choose(
+            "Allow file access?",
+            "This file was opened from another app, which lets UrsaPDF read it but not rename or delete it. Android asks you to allow file access for that.",
+            listOf(
+                "Allow" to {
+                    afterAccess = then
+                    if (Build.VERSION.SDK_INT >= 30) {
+                        try { startActivity(Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:$packageName"))) }
+                        catch (_: Exception) { startActivity(Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
+                    } else requestPermissions(arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), askFiles)
+                },
+                "Not Now" to {},
+            ),
+        )
+    }
+
+    override fun onRequestPermissionsResult(req: Int, perms: Array<out String>, res: IntArray) {
+        super.onRequestPermissionsResult(req, perms, res)
+        if (req == askFiles) runAfterAccess()
+    }
+
+    private fun runAfterAccess() {
+        val then = afterAccess ?: return
+        afterAccess = null
+        if (Disk.allowed(this)) then()
+    }
+
+    /** Deletes the file itself, then forgets it. False if its provider refuses and the disk does too. */
     private fun deleteFile(d: DocState): Boolean {
         val u = Uri.parse(d.uri)
         val ok = try { DocumentsContract.deleteDocument(contentResolver, u) } catch (e: Exception) {
             try { contentResolver.delete(u, null, null) > 0 } catch (_: Exception) { false }
-        }
+        } || (Disk.allowed(this) && Disk.fileOf(this, d.uri)?.let { Disk.delete(this, it) } == true)
         if (ok) {
             try { contentResolver.releasePersistableUriPermission(u, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
             Store.remove(this, d.uri)
@@ -451,9 +501,12 @@ class HomeActivity : Activity() {
     private fun deleteSelected() {
         val p = picked()
         modal.confirm("Delete ${count(p.size)}?", "They will be deleted from this device. This cannot be undone.", "Delete") {
-            val failed = p.count { !deleteFile(it) }
+            val failed = p.filter { !deleteFile(it) }
             stopSelecting(); refresh()
-            toast(if (failed == 0) "Deleted ${count(p.size)}" else "Deleted ${count(p.size - failed)}; ${count(failed)} couldn’t be deleted")
+            val report = { left: Int -> toast(if (left == 0) "Deleted ${count(p.size)}" else "Deleted ${count(p.size - left)}; ${count(left)} couldn’t be deleted") }
+            // Files another app opened read-only go once access is allowed.
+            if (failed.isNotEmpty() && !Disk.allowed(this)) withDisk { val left = failed.count { !deleteFile(it) }; refresh(); report(left) }
+            else report(failed.size)
         }
     }
 
@@ -489,6 +542,7 @@ class HomeActivity : Activity() {
         refresh()
         Updater.resumed(this, home = true)
         fillSizes()
+        if (Build.VERSION.SDK_INT >= 30) runAfterAccess()
     }
 
     /** Entries saved before sizes were kept: look them up off the main thread. */
