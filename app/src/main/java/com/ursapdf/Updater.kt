@@ -10,7 +10,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
-import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -66,19 +65,22 @@ object Updater {
         }
     }
 
+    /** The newest tag and its APK, read from GitHub's release page rather than its API.
+     *  The API allows 60 calls an hour per IP address, and a phone network shares one
+     *  address among many people, so it refused with 403. The page answers a 302 to
+     *  /releases/tag/vX.Y.Z; the APK name is fixed by the release workflow. */
     private fun latest(): Pair<String, String> {
-        val c = URL("https://api.github.com/repos/${BuildConfig.UPDATE_REPO}/releases/latest").openConnection() as HttpURLConnection
-        c.setRequestProperty("Accept", "application/vnd.github+json")
+        val repo = BuildConfig.UPDATE_REPO
+        val c = URL("https://github.com/$repo/releases/latest").openConnection() as HttpURLConnection
+        c.instanceFollowRedirects = false
         c.connectTimeout = 10_000; c.readTimeout = 15_000
-        if (c.responseCode == 404) error("No release published yet")
-        val j = JSONObject(c.inputStream.bufferedReader().use { it.readText() })
-        val tag = j.getString("tag_name").removePrefix("v")
-        val assets = j.getJSONArray("assets")
-        for (i in 0 until assets.length()) {
-            val a = assets.getJSONObject(i)
-            if (a.getString("name").endsWith(".apk")) return tag to a.getString("browser_download_url")
-        }
-        error("Release $tag has no APK")
+        val code = c.responseCode
+        val to = c.getHeaderField("Location")
+        c.disconnect()
+        if (code !in 300..399 || to == null) error("GitHub answered $code")
+        val tag = to.substringAfter("/releases/tag/", "").removePrefix("v")
+        if (tag.isEmpty()) error("No release published yet")
+        return tag to "https://github.com/$repo/releases/download/v$tag/${repo.substringAfter('/')}-$tag.apk"
     }
 
     private fun fetch(c: Context, url: String, progress: ((Int) -> Unit)? = null): File {
@@ -86,6 +88,7 @@ object Updater {
         f.parentFile?.mkdirs()
         val conn = URL(url).openConnection() as HttpURLConnection
         conn.connectTimeout = 10_000; conn.readTimeout = 30_000
+        if (conn.responseCode != 200) error("GitHub answered ${conn.responseCode}")
         val total = conn.contentLengthLong
         conn.inputStream.use { i ->
             f.outputStream().use { o ->
