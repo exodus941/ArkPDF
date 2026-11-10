@@ -60,7 +60,8 @@ class HomeActivity : Activity() {
     private lateinit var modal: Modal
     private lateinit var menu: Menu
     private lateinit var gate: LibraryGate
-    private var bottomInset = 0
+    private lateinit var openRow: LinearLayout
+    private var imeInset = 0
     private val onTheme: () -> Unit = { applyTheme() }
 
     override fun onCreate(b: Bundle?) {
@@ -91,7 +92,7 @@ class HomeActivity : Activity() {
         header.addView(updateBtn, LinearLayout.LayoutParams(dpi(48), dpi(48)))
         root.addView(header)
 
-        // The list scrolls under the sticky block (Open a PDF and search), which is
+        // The list scrolls under the sticky block (the search field), which is
         // drawn last so it sits above everything in the body.
         val body = FrameLayout(this)
         list = ListView(this).apply {
@@ -125,6 +126,9 @@ class HomeActivity : Activity() {
         body.addView(sticky, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.TOP))
         sticky.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> place() }
         root.addView(body, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
+        openRow = buildOpenRow()
+        root.addView(openRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        openRow.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> place() }
 
         bar = buildSelectionBar()
         frame.addView(bar, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.BOTTOM))
@@ -135,7 +139,8 @@ class HomeActivity : Activity() {
             root.setPadding(s[0], s[1], s[2], 0)
             @Suppress("DEPRECATION")
             val ime = if (Build.VERSION.SDK_INT >= 30) ins.getInsets(WindowInsets.Type.ime()).bottom else ins.systemWindowInsetBottom
-            bottomInset = maxOf(s[3], ime)
+            imeInset = ime
+            openRow.setPadding(dpi(16), dpi(8), dpi(16), s[3] + dpi(16))
             bar.setPadding(s[0] + dpi(8), dpi(8), s[2] + dpi(8), dpi(8) + s[3])
             place()
             ins
@@ -163,18 +168,6 @@ class HomeActivity : Activity() {
         orientation = LinearLayout.VERTICAL
         isClickable = true
         setPadding(dpi(16), dpi(4), dpi(16), dpi(12))
-        val openBtn = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = pill(ACCENT, 14f)
-            foreground = ripple()
-            setPadding(dpi(16), dpi(16), dpi(16), dpi(16))
-            addView(ImageView(context).apply { setImageResource(R.drawable.ic_add) })
-            addView(label("Open a PDF", 16f, BG, bold = true).apply { setPadding(dpi(12), 0, 0, 0) })
-            setOnClickListener { openPicker() }
-        }
-        addView(openBtn, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-
         searchBox = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -206,7 +199,24 @@ class HomeActivity : Activity() {
             list.setSelection(0)
         }.apply { visibility = View.GONE }
         searchBox.addView(clear, LinearLayout.LayoutParams(dpi(48), dpi(48)))
-        addView(searchBox, LinearLayout.LayoutParams(MATCH_PARENT, dpi(48)).apply { topMargin = dpi(12) })
+        addView(searchBox, LinearLayout.LayoutParams(MATCH_PARENT, dpi(48)))
+    }
+
+    /** The bottom row, UrsaNotes' and UrsaMeds' place: 16 dp from the sides and 16 dp above
+     *  the navigation bar. The button is 56 dp tall. */
+    private fun buildOpenRow() = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        val openBtn = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = pill(ACCENT, 14f)
+            foreground = ripple()
+            setPadding(dpi(16), 0, dpi(16), 0)
+            addView(ImageView(context).apply { setImageResource(R.drawable.ic_add) })
+            addView(label("Open a PDF", 16f, BG, bold = true).apply { setPadding(dpi(12), 0, 0, 0) })
+            setOnClickListener { openPicker() }
+        }
+        addView(openBtn, LinearLayout.LayoutParams(0, dpi(56), 1f))
     }
 
     private fun buildSelectionBar() = LinearLayout(this).apply {
@@ -234,15 +244,13 @@ class HomeActivity : Activity() {
         // still scroll up underneath. (Top padding set after the first layout left rows
         // hidden behind the block.)
         if (spacer.layoutParams.height != h) { spacer.layoutParams.height = h; spacer.requestLayout() }
-        list.setPadding(0, 0, 0, bottomInset + if (selecting) bar.height else 0)
+        // The list ends on the open row. Whatever covers more than the row (the keyboard,
+        // or a selection bar taller than it) pads the list and lifts the shadow to its edge.
+        val over = maxOf(0, (if (selecting) bar.height else imeInset) - openRow.height)
+        list.setPadding(0, 0, 0, over)
         topFade.translationY = h.toFloat()
         empty.translationY = h + dp(24f)
-        // The list runs under the gesture bar, so the shadow runs to the screen's edge too;
-        // stopping above the bar left its darkest row against white. Over the selection
-        // bar it sits on the bar's top edge instead.
-        val fadeH = dpi(48) + if (selecting) 0 else bottomInset
-        if (bottomFade.layoutParams.height != fadeH) { bottomFade.layoutParams.height = fadeH; bottomFade.requestLayout() }
-        bottomFade.translationY = -(if (selecting) bar.height else 0).toFloat()
+        bottomFade.translationY = -over.toFloat()
         updateFades()
     }
 
@@ -432,6 +440,9 @@ class HomeActivity : Activity() {
         if (!selecting) {
             selecting = true
             bar.animate().translationY(0f).setDuration(Motion.MS).setInterpolator(Motion.IN).start()
+            // The bar is shorter than the open row, so the row fades out rather than peek above it.
+            openRow.animate().alpha(0f).setDuration(Motion.MS).setInterpolator(Motion.FADE).start()
+            openRow.getChildAt(0).isEnabled = false
             animateSel(1f)
         }
         toggle(d)
@@ -481,6 +492,8 @@ class HomeActivity : Activity() {
         selecting = false
         selected.clear()
         bar.animate().translationY(bar.height.toFloat()).setDuration(Motion.MS).setInterpolator(Motion.OUT).start()
+        openRow.animate().alpha(1f).setDuration(Motion.MS).setInterpolator(Motion.FADE).start()
+        openRow.getChildAt(0).isEnabled = true
         animateSel(0f)
         rows.notifyDataSetChanged()
         place()
