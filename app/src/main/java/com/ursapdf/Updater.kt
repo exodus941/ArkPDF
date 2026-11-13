@@ -39,7 +39,7 @@ object Updater {
         }
     }
 
-    private fun apkFile(c: Context) = File(c.cacheDir, "update/UrsaPDF.apk")
+    private fun apkFile(c: Context) = File(c.cacheDir, "update/ArkPDF.apk")
 
     /** Call from every activity's onResume; [home] is true for the home list. */
     fun resumed(a: Activity, home: Boolean) {
@@ -61,26 +61,34 @@ object Updater {
         if (seen != BuildConfig.VERSION_NAME) {
             p.edit().putString("version", BuildConfig.VERSION_NAME).apply()
             if (seen != null && newer(BuildConfig.VERSION_NAME, seen))
-                a.note("UrsaPDF updated to ${BuildConfig.VERSION_NAME}")
+                a.note("ArkPDF updated to ${BuildConfig.VERSION_NAME}")
         }
     }
 
     /** The newest tag and its APK, read from GitHub's release page rather than its API.
      *  The API allows 60 calls an hour per IP address, and a phone network shares one
      *  address among many people, so it refused with 403. The page answers a 302 to
-     *  /releases/tag/vX.Y.Z; the APK name is fixed by the release workflow. */
+     *  /releases/tag/vX.Y.Z. A renamed repo first answers a 301 to its new address, so
+     *  up to 3 such hops are followed, and the APK name comes from the repo's final name. */
     private fun latest(): Pair<String, String> {
-        val repo = BuildConfig.UPDATE_REPO
-        val c = URL("https://github.com/$repo/releases/latest").openConnection() as HttpURLConnection
-        c.instanceFollowRedirects = false
-        c.connectTimeout = 10_000; c.readTimeout = 15_000
-        val code = c.responseCode
-        val to = c.getHeaderField("Location")
-        c.disconnect()
-        if (code !in 300..399 || to == null) error("GitHub answered $code")
-        val tag = to.substringAfter("/releases/tag/", "").removePrefix("v")
-        if (tag.isEmpty()) error("No release published yet")
-        return tag to "https://github.com/$repo/releases/download/v$tag/${repo.substringAfter('/')}-$tag.apk"
+        var url = "https://github.com/${BuildConfig.UPDATE_REPO}/releases/latest"
+        repeat(4) {
+            val c = URL(url).openConnection() as HttpURLConnection
+            c.instanceFollowRedirects = false
+            c.connectTimeout = 10_000; c.readTimeout = 15_000
+            val code = c.responseCode
+            val to = c.getHeaderField("Location")
+            c.disconnect()
+            if (code !in 300..399 || to == null) error("GitHub answered $code")
+            val m = Regex("github\\.com/([^/]+/([^/]+))/releases/tag/v([^/?#]+)").find(to)
+            if (m != null) {
+                val (repo, name, tag) = m.destructured
+                return tag to "https://github.com/$repo/releases/download/v$tag/$name-$tag.apk"
+            }
+            if (!to.endsWith("/releases/latest")) error("No release published yet")
+            url = to
+        }
+        error("GitHub redirected too many times")
     }
 
     private fun fetch(c: Context, url: String, progress: ((Int) -> Unit)? = null): File {
@@ -138,7 +146,7 @@ object Updater {
                 result.onFailure { a.note("Update check failed: ${it.message}") }
                 result.onSuccess { (tag, url) ->
                     if (!newer(tag, BuildConfig.VERSION_NAME)) {
-                        a.note("You are already on the latest version of UrsaPDF")
+                        a.note("You are already on the latest version of ArkPDF")
                         return@onSuccess
                     }
                     a.note("Update found, downloading version $tag")
@@ -182,7 +190,7 @@ object Updater {
             }
             val id = pi.createSession(params)
             pi.openSession(id).use { s ->
-                s.openWrite("UrsaPDF.apk", 0, file.length()).use { out ->
+                s.openWrite("ArkPDF.apk", 0, file.length()).use { out ->
                     file.inputStream().use { it.copyTo(out, 1 shl 16) }
                     s.fsync(out)
                 }

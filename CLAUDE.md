@@ -1,6 +1,6 @@
-# UrsaPDF
+# ArkPDF
 
-Minimal, fast Android PDF reader. Repo `exodus941/UrsaPDF`; a `vX.Y.Z` tag builds
+Minimal, fast Android PDF reader. Repo `exodus941/ArkPDF`; a `vX.Y.Z` tag builds
 and publishes the release APK. Toolchain, signing key and emulator notes are in
 memory `ursapdf.md`.
 

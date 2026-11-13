@@ -28,13 +28,13 @@ jobs:
           V="${GITHUB_REF_NAME#v}"
           chmod +x gradlew
           ./gradlew assembleRelease -PversionName="$V" --no-daemon
-          cp app/build/outputs/apk/release/app-release.apk "UrsaPDF-$V.apk"
+          cp app/build/outputs/apk/release/app-release.apk "ArkPDF-$V.apk"
           rm -f ursapdf.keystore
       # The engine is not attached here: engine.yml publishes it into engine/ on main.
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" UrsaPDF-*.apk --title "UrsaPDF ${GITHUB_REF_NAME}" --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" ArkPDF-*.apk --title "ArkPDF ${GITHUB_REF_NAME}" --generate-notes
       # Only the newest release exists: every other release and its tag is deleted.
       - name: Remove older releases
         env:

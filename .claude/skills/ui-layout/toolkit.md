@@ -11,7 +11,7 @@ measurement disagrees with the eye.
 
 - **Name what answers to what.**
 - **A tag list finds the cases somebody already thought of, and approves the rest.** Ask the property, never a list of class names or a substring.
-- **A row carries its label's type, or the cap band is computed from the wrong size.** The band is stated as `0.75em`, and `em` resolves against the element carrying the transform.
+- **A row carries its label's type, or the cap band is computed from the wrong size.** The band is the label's measured cap height, for that font at that size, never a fixed `em` ratio. An `em` value resolves against the element carrying the transform.
 - **A text-less wrapper takes its baseline from its bottom margin edge.** Where an editor wraps each instance, the wrapper is the flex item, so put the rule on the wrapper.
 - **`getComputedStyle().height` never returns `auto` for a rendered element**, so never write a guard as "only where a height is stated".
 - **The repair for a false positive is the fault, not an exemption.** Ask the fault itself rather than exempting the components it misfires on.

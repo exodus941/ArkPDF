@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "UrsaPDF"
+rootProject.name = "ArkPDF"
 include(":app")

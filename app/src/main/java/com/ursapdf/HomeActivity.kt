@@ -77,7 +77,7 @@ class HomeActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dpi(20), dpi(12), dpi(8), dpi(8))
         }
-        title = label("UrsaPDF", 24f, Theme.text(), bold = true)
+        title = label("ArkPDF", 24f, Theme.text(), bold = true)
         version = label(BuildConfig.VERSION_NAME, 13f, Theme.text(), bold = true)
         // TOP gravity, not centre: only then does LinearLayout line the two baselines up.
         header.addView(LinearLayout(this).apply {
@@ -202,7 +202,7 @@ class HomeActivity : Activity() {
         addView(searchBox, LinearLayout.LayoutParams(MATCH_PARENT, dpi(48)))
     }
 
-    /** The bottom row, UrsaNotes' and UrsaMeds' place: 16 dp from the sides and 16 dp above
+    /** The bottom row, ArkNotes' and ArkMeds' place: 16 dp from the sides and 16 dp above
      *  the navigation bar. The button is 56 dp tall. */
     private fun buildOpenRow() = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
@@ -399,7 +399,7 @@ class HomeActivity : Activity() {
         if (Disk.allowed(this)) { then(); return }
         modal.choose(
             "Allow file access?",
-            "This file was opened from another app, which lets UrsaPDF read it but not rename or delete it. Android asks you to allow file access for that.",
+            "This file was opened from another app, which lets ArkPDF read it but not rename or delete it. Android asks you to allow file access for that.",
             listOf(
                 "Allow" to {
                     afterAccess = then
