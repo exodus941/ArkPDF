@@ -44,7 +44,7 @@ class HomeActivity : Activity() {
     private lateinit var title: TextView
     private lateinit var version: TextView
     private lateinit var themeBtn: ImageView
-    private lateinit var updateBtn: ImageView
+    private lateinit var moreBtn: ImageView
     private lateinit var sticky: LinearLayout
     private lateinit var search: EditText
     private lateinit var searchBox: LinearLayout
@@ -88,8 +88,8 @@ class HomeActivity : Activity() {
         }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
         themeBtn = iconButton(R.drawable.ic_bulb_on, "Toggle Light Mode") { Theme.toggle(this) }
         header.addView(themeBtn, LinearLayout.LayoutParams(dpi(48), dpi(48)))
-        updateBtn = iconButton(R.drawable.ic_refresh, "Check for Updates") { Updater.check(this) }
-        header.addView(updateBtn, LinearLayout.LayoutParams(dpi(48), dpi(48)))
+        moreBtn = iconButton(R.drawable.ic_more, "Options") { mainMenu(moreBtn) }
+        header.addView(moreBtn, LinearLayout.LayoutParams(dpi(48), dpi(48)))
         root.addView(header)
 
         // The list scrolls under the sticky block (the search field), which is
@@ -277,7 +277,7 @@ class HomeActivity : Activity() {
         sticky.setBackgroundColor(Theme.bg())
         title.setTextColor(Theme.text())
         version.setTextColor(Theme.text())
-        for (b in listOf(themeBtn, updateBtn, clear)) {
+        for (b in listOf(themeBtn, moreBtn, clear)) {
             b.setColorFilter(Theme.text())
             (b.background as? RippleDrawable)?.setColor(ColorStateList.valueOf(Theme.ripple()))
         }
@@ -334,6 +334,19 @@ class HomeActivity : Activity() {
     private fun hideKeyboard() {
         getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(search.windowToken, 0)
         search.clearFocus()
+    }
+
+    // ---- menus ----
+
+    private fun mainMenu(anchor: View) {
+        val rows = listOf(
+            Menu.Row("GitHub", icon = R.drawable.ic_github) {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/${BuildConfig.UPDATE_REPO}")))
+            },
+            Menu.Row("Check for Updates", icon = R.drawable.ic_refresh) { Updater.check(this) },
+        )
+        val at = IntArray(2).also { anchor.getLocationInWindow(it) }
+        menu.show(rows, Gravity.TOP or Gravity.END, dpi(12), at[1])
     }
 
     // ---- one file ----
