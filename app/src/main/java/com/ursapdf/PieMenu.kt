@@ -29,8 +29,11 @@ class PieMenu(
     private val leftHanded: Boolean, private val done: (PieMenu) -> Unit,
 ) : View(a) {
 
-    /** [enabled] false draws the segment dimmed and it cannot be picked. */
-    class Item(val icon: Int, val name: String, val enabled: Boolean = true, val act: () -> Unit)
+    /**
+     * [enabled] false draws the segment dimmed and it cannot be picked. [on] marks a toggle
+     * that is on now: an amber stroke along its stretch of the outer rim.
+     */
+    class Item(val icon: Int, val name: String, val enabled: Boolean = true, val on: Boolean = false, val act: () -> Unit)
 
     companion object {
         const val TILT = 20f
@@ -94,6 +97,10 @@ class PieMenu(
     private val icons = items.map { a.getDrawable(it.icon)!!.mutate() }
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = a.dp(1f) }
+    private val onW = a.dp(4f)
+    private val onGap = a.dp(4f)  // clear space each side, past the round cap
+    private val onPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = onW; strokeCap = Paint.Cap.ROUND }
+    private val rim = RectF()
     private val wedge = Path()
     private val oval = RectF()
     private val inner = RectF()
@@ -465,6 +472,15 @@ class PieMenu(
         if (glow > 0f) drawGlow(c)
         edge.color = Theme.outline()
         c.drawOval(oval, edge)
+        // An item that is on: a stroke inside the rim over its segment, stopping short of the
+        // dividers so two on segments side by side stay two marks. It turns dark on the yellow.
+        rim.set(oval); rim.inset(onW / 2, onW / 2)
+        val gap = Math.toDegrees(((onGap + onW / 2) / (outerR - onW / 2)).toDouble()).toFloat()
+        items.forEachIndexed { k, it ->
+            if (!it.on) return@forEachIndexed
+            onPaint.color = blend.evaluate(lit[k], ACCENT, BG) as Int
+            c.drawArc(rim, -90f + k * step - step / 2 + gap, step - 2 * gap, false, onPaint)
+        }
         val mid = (innerR + outerR) / 2
         items.forEachIndexed { k, it ->
             val r = Math.toRadians((-90f + k * step).toDouble())

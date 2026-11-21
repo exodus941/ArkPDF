@@ -621,7 +621,11 @@ class HomeActivity : Activity() {
     }
 
     private fun open(uri: Uri) {
-        startActivity(Intent(this, ReaderActivity::class.java).setData(uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+        val i = Intent(this, ReaderActivity::class.java).setData(uri)
+        // A grant we no longer hold (a revoked or expired file) throws here. Without the flag the
+        // reader still starts, says it cannot open the file and drops it from the list.
+        try { startActivity(Intent(i).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)) }
+        catch (_: SecurityException) { startActivity(i) }
     }
 
     private inner class Adapter : BaseAdapter() {

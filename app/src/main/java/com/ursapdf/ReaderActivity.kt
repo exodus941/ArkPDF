@@ -524,10 +524,10 @@ class ReaderActivity : Activity(), PdfView.Listener {
         val marked = pdf.currentPage in (state?.bookmarks ?: emptyMap<Int, String>())
         // Clockwise from the top, for a right thumb: the most used up and to the left, the
         // rarest bottom right, under the thumb. Left-handed mirrors it side to side.
-        val add = PieMenu.Item(if (marked) R.drawable.ic_bookmark_minus else R.drawable.ic_bookmark, if (marked) "Remove Bookmark" else "Add Bookmark") { toggleBookmark() }
-        val invert = PieMenu.Item(R.drawable.ic_invert, "Invert Colours") { toggleInvert() }
+        val add = PieMenu.Item(if (marked) R.drawable.ic_bookmark_minus else R.drawable.ic_bookmark, if (marked) "Remove Bookmark" else "Add Bookmark", on = marked) { toggleBookmark() }
+        val invert = PieMenu.Item(R.drawable.ic_invert, "Invert Colours", on = state?.invert == true) { toggleInvert() }
         val crop = PieMenu.Item(R.drawable.ic_frame, "Page Cropper") { openCropper() }
-        val lock = PieMenu.Item(R.drawable.ic_lock, "Zoom Lock") { toggleLock() }
+        val lock = PieMenu.Item(R.drawable.ic_lock, "Zoom Lock", on = pdf.lockZoom > 0f) { toggleLock() }
         val find = PieMenu.Item(R.drawable.ic_search, "Search", tools?.canSearch == true) { showUi(); openSearch() }
         val list = PieMenu.Item(R.drawable.ic_bookmarks, "Show Bookmarks") { showBookmarks() }
         val right = listOf(add, invert, crop, lock, find, list)
