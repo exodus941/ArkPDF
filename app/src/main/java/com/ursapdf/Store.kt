@@ -19,11 +19,12 @@ class DocState(val uri: String, var name: String) {
     val bookmarks = sortedMapOf<Int, String>()  // page index to name; "" means unnamed
     var lock = 0f     // zoom lock: the locked zoom, 0 when off
     var continuous = false  // every page in one vertical stack
+    var turn = -1     // rotation lock: the locked ActivityInfo orientation, -1 when off
 }
 
 /**
  * The recents list, under "docs". A file that leaves the list (removed, or pushed past
- * [MAX]) keeps its crop, bookmarks, zoom lock and Continuous Mode under "kept" until the app is
+ * [MAX]) keeps its crop, bookmarks, zoom lock, rotation lock and Continuous Mode under "kept" until the app is
  * uninstalled; opening it again brings them back.
  */
 object Store {
@@ -48,6 +49,7 @@ object Store {
         j.optJSONArray("bm")?.let { a -> for (k in 0 until a.length()) a.optJSONObject(k)?.let { o -> bookmarks[o.getInt("p")] = o.optString("n") } ?: run { bookmarks[a.getInt(k)] = "" } }
         lock = j.optDouble("lk", 0.0).toFloat()
         continuous = j.optBoolean("ct", false)
+        turn = j.optInt("ro", -1)
     }
 
     private fun json(d: DocState) = JSONObject().apply {
@@ -60,6 +62,7 @@ object Store {
         if (d.bookmarks.isNotEmpty()) put("bm", JSONArray().apply { for ((p, n) in d.bookmarks) put(JSONObject().put("p", p).put("n", n)) })
         if (d.lock > 0f) put("lk", d.lock.toDouble())
         if (d.continuous) put("ct", true)
+        if (d.turn >= 0) put("ro", d.turn)
     }
 
     private fun list(c: Context, key: String): MutableList<DocState> {
@@ -108,7 +111,7 @@ object Store {
         list[i] = DocState(newUri, newName).also { d ->
             d.page = o.page; d.offset = o.offset; d.x = o.x; d.zoom = o.zoom; d.invert = o.invert
             d.pages = o.pages; d.size = o.size; d.crop.set(o.crop); d.opened = o.opened; d.bookmarks.putAll(o.bookmarks)
-            d.lock = o.lock; d.continuous = o.continuous
+            d.lock = o.lock; d.continuous = o.continuous; d.turn = o.turn
         }
         write(c, list)
     }
@@ -120,7 +123,7 @@ object Store {
         write(c, list)
     }
 
-    private fun hasKeep(d: DocState) = d.bookmarks.isNotEmpty() || d.lock > 0f || d.continuous || d.crop != RectF(0f, 0f, 1f, 1f)
+    private fun hasKeep(d: DocState) = d.bookmarks.isNotEmpty() || d.lock > 0f || d.continuous || d.turn >= 0 || d.crop != RectF(0f, 0f, 1f, 1f)
 
     /**
      * The list, at most [MAX]; [dropped] and any entry past [MAX] move to "kept" when they

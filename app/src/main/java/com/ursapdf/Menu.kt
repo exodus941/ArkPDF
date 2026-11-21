@@ -57,6 +57,7 @@ class Menu(private val a: Activity, private val host: View) {
             elevation = a.dp(8f)
             alpha = 0f
             isVerticalScrollBarEnabled = true
+            clipToOutline = true  // a capped, scrolled list stays inside the rounded box
             addView(b, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         }
         box = b; outer = o

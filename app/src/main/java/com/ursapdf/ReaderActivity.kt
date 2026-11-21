@@ -3,12 +3,15 @@ package com.ursapdf
 import android.animation.ValueAnimator
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.graphics.RectF
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.text.TextUtils
 import android.view.Gravity
+import android.view.Surface
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
@@ -235,6 +238,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
         e.invert = if (s.invert) 1f else 0f
         titleView.text = s.name
         pdf.lockZoom = s.lock
+        requestedOrientation = if (s.turn >= 0) s.turn else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         pdf.continuous = s.continuous
         pdf.pageTurn = pageTurn && !s.continuous
         pdf.setDocument(e, s.page.coerceIn(0, e.pageCount - 1), s.offset, s.x, if (s.lock > 0f) s.lock else s.zoom)
@@ -410,7 +414,11 @@ class ReaderActivity : Activity(), PdfView.Listener {
         menuOf = from
         // Its end edge lines up with the button's end edge.
         val at = IntArray(2).also { from.getLocationInWindow(it) }
-        menu.show(rows, Gravity.TOP or Gravity.END, root.width - (at[0] + from.width), top.height)
+        // Too tall for the space under the bar (landscape), it scrolls rather than covering the bar.
+        @Suppress("DEPRECATION")
+        val nav = root.rootWindowInsets?.systemWindowInsetBottom ?: 0
+        menu.show(rows, Gravity.TOP or Gravity.END, root.width - (at[0] + from.width), top.height,
+            maxHeight = root.height - top.height - nav - dpi(8))
     }
 
     private fun moreMenu() {
@@ -427,7 +435,33 @@ class ReaderActivity : Activity(), PdfView.Listener {
             Menu.Row("Page Turn", mark = { toggle(pageTurn && state?.continuous != true) }, stay = true) {
                 if (state?.continuous == true) { pageTurn = true; setContinuous(false) } else pageTurn = !pageTurn
             },
+            Menu.Row("Rotation Lock", mark = { toggle((state?.turn ?: -1) >= 0) }, stay = true) { toggleTurn() },
         ))
+    }
+
+    /** Locks this file to the way the phone is held now, upside-down included; off follows the phone again. */
+    private fun toggleTurn() {
+        val s = state ?: return
+        s.turn = if (s.turn >= 0) -1 else heldAs()
+        requestedOrientation = if (s.turn >= 0) s.turn else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        save()
+        toast(if (s.turn >= 0) "Rotation locked" else "Rotation unlocked")
+    }
+
+    /** The orientation the screen shows now, as an ActivityInfo value. */
+    @Suppress("DEPRECATION")
+    private fun heldAs(): Int {
+        val rot = windowManager.defaultDisplay.rotation
+        val land = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val upright = rot == Surface.ROTATION_0 || rot == Surface.ROTATION_180
+        // A phone's natural way is portrait; a tablet's is often landscape.
+        val tallNatural = upright != land
+        return when (rot) {
+            Surface.ROTATION_0 -> if (tallNatural) ActivityInfo.SCREEN_ORIENTATION_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            Surface.ROTATION_90 -> if (tallNatural) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
+            Surface.ROTATION_180 -> if (tallNatural) ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+            else -> if (tallNatural) ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
     }
 
     /** Locks the zoom the page is at now, for this file. */
