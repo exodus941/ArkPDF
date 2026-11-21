@@ -526,12 +526,11 @@ class ReaderActivity : Activity(), PdfView.Listener {
         // rarest bottom right, under the thumb. Left-handed mirrors it side to side.
         val add = PieMenu.Item(if (marked) R.drawable.ic_bookmark_minus else R.drawable.ic_bookmark, if (marked) "Remove Bookmark" else "Add Bookmark", on = marked) { toggleBookmark() }
         val invert = PieMenu.Item(R.drawable.ic_invert, "Invert Colours", on = state?.invert == true) { toggleInvert() }
-        val crop = PieMenu.Item(R.drawable.ic_frame, "Page Cropper") { openCropper() }
         val lock = PieMenu.Item(R.drawable.ic_lock, "Zoom Lock", on = pdf.lockZoom > 0f) { toggleLock() }
         val turn = PieMenu.Item(R.drawable.ic_rotate, "Rotation Lock", on = (state?.turn ?: -1) >= 0) { toggleTurn() }
         val find = PieMenu.Item(R.drawable.ic_search, "Search", tools?.canSearch == true) { showUi(); openSearch() }
         val list = PieMenu.Item(R.drawable.ic_bookmarks, "Show Bookmarks") { showBookmarks() }
-        val right = listOf(add, invert, crop, lock, turn, find, list)
+        val right = listOf(add, invert, lock, turn, find, list)
         val items = if (leftPie) listOf(add) + right.drop(1).reversed() else right
         val p = PieMenu(this, items, x, y, leftPie) { root.removeView(it) }
         pie = p
